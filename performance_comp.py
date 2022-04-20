@@ -7,6 +7,9 @@
 # Assume tests are X, Y
 # Assume iterations is 3
 # Order of operations is: A-X, A-Y, B-X, B-Y, C-X, C-Y, repeated 2 more times
+
+# Use `-n` command line argument to not include the default driver in the tests
+
 import subprocess
 import sys
 import os
@@ -21,7 +24,7 @@ iterations = 10
 driver_dir = '../driver_versions'
 # default driver is assumed, AKA `modprobe ibmveth`
 driver_files = ['tx_no_unmap', 'tx_one_ltb', 'tx_multi_q']
-
+USING_DEFAULT_DRIVER = True
 #USER TODO
 iperf3_server_ip = "PUT IP HERE"
 def iperf3_test_print(results):
@@ -153,7 +156,10 @@ def print_results(res, drivers):
 	num_diff_drivers = len(drivers)
 	num_diff_tests = len(tests)
 	num_unique_tests = num_diff_drivers * num_diff_tests
-	col_labels = ["default"] + drivers[1:]
+	if USING_DEFAULT_DRIVER:
+		col_labels = ["default"] + drivers[1:]
+	else:
+		col_labels = drivers
 	row_labels = list(range(iterations)) + ["AVG"]
 	for t in range(num_diff_tests):
 		print(f"TEST: {tests[t].__name__}")
@@ -166,15 +172,18 @@ def print_results(res, drivers):
 		table.append(row)
 		print(pandas.DataFrame(table, index=row_labels, columns=col_labels))
 
-default_driver_file = get_default_driver()
-driver_files.insert(0, default_driver_file)
+if "-n" in sys.argv:
+	USING_DEFAULT_DRIVER = False
+else:
+	default_driver_file = get_default_driver()
+	driver_files.insert(0, default_driver_file)
 results = []
 pandas.set_option('display.max_columns', None)
 pandas.set_option('display.max_rows', None)
 for itr in range(iterations):
 
 	for driver in driver_files:
-		if driver is default_driver_file:
+		if USING_DEFAULT_DRIVER and driver is default_driver_file:
 			load_external_module(driver)
 		else:
 			load_external_module(driver_dir + "/" + driver)
