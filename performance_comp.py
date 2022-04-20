@@ -2,6 +2,11 @@
 # The different versions of the driver are in ${driver_dir}/${driver_file}
 # The tests are run a ${iterations} times on each driver file
 # The results are then averaged and can be compared by the user
+# The order of execution is as follows:
+# Assume drivers are A, B, C
+# Assume tests are X, Y
+# Assume iterations is 3
+# Order of operations is: A-X, A-Y, B-X, B-Y, C-X, C-Y, repeated 2 more times
 import subprocess
 import sys
 import os
@@ -11,28 +16,94 @@ import numpy as np
 import pandas 
 
 driver_name = 'ibmveth'
-iterations = 3
+iterations = 10
 # drivers must be already in ./${driver_dir}/${driver_file}
 driver_dir = '../driver_versions'
 # default driver is assumed, AKA `modprobe ibmveth`
 driver_files = ['tx_no_unmap', 'tx_one_ltb', 'tx_multi_q']
 
+#USER TODO
+iperf3_server_ip = "PUT IP HERE"
 def iperf3_test_print(results):
-	return f'{round(results[0], 2)} Gbs, {round(results[1], 2)} retries'
+	return f'{round(results[0], 2)} Gbs, {round(results[1], 2)} rtx'
 def iperf3_test():
 	# return [bitrate (in Gbits/sec), retries]
-	command = "iperf3 -c  9.40.195.146 -t 2"
+	command = f"iperf3 -c {iperf3_server_ip} -t 60"
 	results = run_regex_cmd(command, r"(\d+\.\d+) Gbits/sec(?:\s+)(\d+)(?:\s+) sender")
-	ret = [float(results[1]), float(results[2])]
-	print(f"RET {ret}")
+	ret = [float(results[0][0]), float(results[0][1])]
 	return ret
 
+trace_func_tracked = ["ibmveth_start_xmit", "ibmveth_poll"]
+def trace_print(results):
+	print_string = ''
+	for f in range(len(trace_func_tracked)):
+		print_string += f'{trace_func_tracked[f]} {round(results[f], 2)} us, '
+	return print_string[:-2]
+def trace_test():
+	# return [avg time of trace_func_tracked]
+	cmd = f"iperf3 -c {iperf3_server_ip}  -t 20"
+	ftrace_dir = "/sys/kernel/debug/tracing"
+	# clear old data
+	assert run_cmd(f"echo 0 > {ftrace_dir}/tracing_on")
+	assert run_cmd(f"echo > {ftrace_dir}/trace")
+	assert run_cmd(f"echo > {ftrace_dir}/set_ftrace_filter")
+	assert run_cmd(f"echo nop > {ftrace_dir}/current_tracer")
+	assert run_cmd(f"echo 1 > {ftrace_dir}/options/graph-time")
+	funcs_want_str = ""
+	for f in trace_func_tracked:
+		funcs_want_str += f + " "
+	assert run_cmd(f"echo {funcs_want_str} > {ftrace_dir}/set_ftrace_filter")
+	assert run_cmd(f"echo 1 > {ftrace_dir}/function_profile_enabled")
+	# tracing is now on for our functions
+	assert run_cmd(cmd)
+	# stop tracing
+	assert run_cmd(f"echo 0 > {ftrace_dir}/function_profile_enabled")
+	regex_funcs = funcs_want_str[:-1].replace(" ", "|")
+	# regex should return [func_name, times_called, avg_time per call]
+	matches = run_regex_cmd(f"cat {ftrace_dir}/trace_stat/function*",r"(ibmveth_start_xmit|ibmveth_poll)(?:\s+)(\d+)(?:\s+)(?:\S+)(?:\s+)(?:\S+)(?:\s+)(\d+\.\d+)(?:\s+)us")
+	# record [times called, avg time]
+	results = []
+	for init in range(len(trace_func_tracked)):
+		results.append([])
+	# record total number of calls
+	total_calls = [0] * len(trace_func_tracked)
+	for m in matches:
+		f = -1
+		# get function associated with this match
+		for n in range(len(trace_func_tracked)):
+			if m[0] == trace_func_tracked[n]:
+				f = n
+				break
+		assert f != -1
+		print(f"remove later match: {m}")
+		print(f"{[float(m[1]), float(m[2])]}")
+		results[f].append([float(m[1]), float(m[2])])
+		total_calls[f] += float(m[1])
+		print(f"{trace_func_tracked[f]} count: {m[1]} avg: {m[2]}")
+	# we need to weight these averages since
+	# sometimes ftrace can show wierd results like
+	# FUNCTION  	COUNT 		AVG
+	#   foobar		  6		   400 us
+	#	foobar		 600		4 us
+	# obviously the instance where foobar is called 600 times
+	# is more reliable so we need to weight these AVG values by the
+	# percent of the instance's count vs the total count for this function
+
+	avg_results = []
+	for f in range(len(trace_func_tracked)):
+		avg_results.append(0)
+		print(f"{len(results[f])} samples for {trace_func_tracked[f]} : {results[f]}")
+		for i in results[f]:
+			avg_results[f] += i[1] * (i[0] / total_calls[f])
+		print(f"avg time for {trace_func_tracked[f]} is {avg_results[f]}")
+	return avg_results
 # test functions to run, they should return an array of floats
 # this return array is the results of the performance test and 
 # are averaged at the end
-tests = [iperf3_test]
+tests = [iperf3_test, trace_test]
 # functions to return a string representing the results returned from tests
-print_tests = [iperf3_test_print]
+# MAKE SURE SAME ORDER
+print_tests = [iperf3_test_print, trace_print]
 
 # returns True for $? == 0 else False
 def run_cmd(cmd):
@@ -45,7 +116,7 @@ def run_cmd(cmd):
 def run_regex_cmd(cmd, rgx):
 	result = (subprocess.run(cmd, shell = True, capture_output = True, check = True)).stdout.decode('utf-8')
 	print(f'CMD: {cmd}\n{result}')
-	match = re.search(rgx, result)
+	match = re.findall(rgx, result)
 	print(f'MATCH: {match}')
 	return match
 
@@ -54,7 +125,7 @@ def load_external_module(module_file):
 	assert run_cmd(f'insmod {module_file}'), "ERROR: could not insert module " + module_file
 
 def get_default_driver():
-	file = run_regex_cmd(f'modinfo {driver_name}', r"filename:\s*(\S*)\b")[1]
+	file = run_regex_cmd(f'modinfo {driver_name}', r"filename:\s*(\S*)\b")[0]
 	assert file is not None, "ERROR: could not find path to default " + driver_name
 	print("Default is located at " + file)
 	return file
@@ -82,19 +153,18 @@ def print_results(res, drivers):
 	num_diff_drivers = len(drivers)
 	num_diff_tests = len(tests)
 	num_unique_tests = num_diff_drivers * num_diff_tests
-	headers = ["iteration", "default"] + drivers[1:]
+	col_labels = ["default"] + drivers[1:]
+	row_labels = list(range(iterations)) + ["AVG"]
 	for t in range(num_diff_tests):
 		print(f"TEST: {tests[t].__name__}")
 		table = []
 		for i in range(iterations):
 			row = get_string_from_results(res, i, t, num_diff_drivers, num_diff_tests)
-			row.insert(0 , i)
 			table.append(row)
 		# get avg results
 		row = get_string_from_results(res, iterations, t, num_diff_drivers, num_diff_tests)
-		row.insert(0 , "AVG")
 		table.append(row)
-		print(pandas.DataFrame(table, columns=headers))
+		print(pandas.DataFrame(table, index=row_labels, columns=col_labels))
 
 default_driver_file = get_default_driver()
 driver_files.insert(0, default_driver_file)
