@@ -100,13 +100,33 @@ def trace_test():
 			avg_results[f] += i[1] * (i[0] / total_calls[f])
 		print(f"avg time for {trace_func_tracked[f]} is {avg_results[f]}")
 	return avg_results
+
+#USER TODO, must be different then iperf3 due to server side setup
+qperf_server_ip = "USER TODO"
+def parallel_qperf_print(results):
+	return f'{round(results[0],2)} Mb/s'
+def parallel_qperf_test():
+	# returns [bw] summed over all parallel threads
+	cmd = f"parallel --jobs 32 ../qperf/src/qperf --use_bits_per_sec -v -t 60 {qperf_server_ip} -lp {{}} tcp_bw ::: {{1966..1997}}"
+	regex = r"bw(?:\s+)=(?:\s+)(\d+.\d+|\d+)(?:\s+)(G|M)b/s"
+	matches = run_regex_cmd(cmd, regex)
+	total = 0
+	for m in matches:
+		if m[1] == 'G':
+			#convert to Mb's
+			total += (float(m[0]) * 1024)
+		else:
+			total += float(m[0])
+	return [total]
+
+
 # test functions to run, they should return an array of floats
 # this return array is the results of the performance test and 
 # are averaged at the end
-tests = [iperf3_test, trace_test]
+tests = [iperf3_test, trace_test, parallel_qperf_test]
 # functions to return a string representing the results returned from tests
 # MAKE SURE SAME ORDER
-print_tests = [iperf3_test_print, trace_print]
+print_tests = [iperf3_test_print, trace_print, parallel_qperf_print]
 
 # returns True for $? == 0 else False
 def run_cmd(cmd):
