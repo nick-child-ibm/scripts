@@ -102,12 +102,13 @@ def trace_test():
 	return avg_results
 
 #USER TODO, must be different then iperf3 due to server side setup
+# unless one is running in background then its okay just watch port overlap
 qperf_server_ip = "USER TODO"
 def parallel_qperf_print(results):
-	return f'{round(results[0],2)} Mb/s'
-def parallel_qperf_test():
+	return f'{round(results[0] / 1024,2)} Gb/s'
+def parallel_qperf_test(n_jobs = 1):
 	# returns [bw] summed over all parallel threads
-	cmd = f"parallel --jobs 32 ../qperf/src/qperf --use_bits_per_sec -v -t 60 {qperf_server_ip} -lp {{}} tcp_bw ::: {{1966..1997}}"
+	cmd = f"parallel --jobs {n_jobs} ../qperf/src/qperf --use_bits_per_sec -v -t 60 {qperf_server_ip} -lp {{}} tcp_bw ::: {{1966..{1966 + n_jobs - 1}}}"
 	regex = r"bw(?:\s+)=(?:\s+)(\d+.\d+|\d+)(?:\s+)(G|M)b/s"
 	matches = run_regex_cmd(cmd, regex)
 	total = 0
@@ -118,15 +119,21 @@ def parallel_qperf_test():
 		else:
 			total += float(m[0])
 	return [total]
-
-
+def parallel_qperf_test_1_job():
+	return parallel_qperf_test()
+def parallel_qperf_test_2_jobs():
+	return parallel_qperf_test(2)
+def parallel_qperf_test_4_jobs()
+	return parallel_qperf_test(4):
+def parallel_qperf_test_8_jobs():
+	return parallel_qperf_test(8)
 # test functions to run, they should return an array of floats
 # this return array is the results of the performance test and 
 # are averaged at the end
-tests = [iperf3_test, trace_test, parallel_qperf_test]
+tests = [iperf3_test, trace_test, parallel_qperf_test_1_job, parallel_qperf_test_2_jobs, parallel_qperf_test_4_jobs, parallel_qperf_test_8_jobs]
 # functions to return a string representing the results returned from tests
 # MAKE SURE SAME ORDER
-print_tests = [iperf3_test_print, trace_print, parallel_qperf_print]
+print_tests = [iperf3_test_print, trace_print, parallel_qperf_print, parallel_qperf_print, parallel_qperf_print, parallel_qperf_print]
 
 # returns True for $? == 0 else False
 def run_cmd(cmd):
