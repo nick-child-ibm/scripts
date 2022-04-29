@@ -106,9 +106,9 @@ def trace_test():
 qperf_server_ip = "USER TODO"
 def parallel_qperf_print(results):
 	return f'{round(results[0] / 1024,2)} Gb/s'
-def parallel_qperf_test(n_jobs = 1):
+def parallel_qperf_test(n_jobs = 1, msg_size = '64K'):
 	# returns [bw] summed over all parallel threads
-	cmd = f"parallel --jobs {n_jobs} ../qperf/src/qperf --use_bits_per_sec -v -t 60 {qperf_server_ip} -lp {{}} tcp_bw ::: {{1966..{1966 + n_jobs - 1}}}"
+	cmd = f"parallel --jobs {n_jobs} ../qperf/src/qperf --use_bits_per_sec -v -m {msg_size} -t 30 {qperf_server_ip} -lp {{}} tcp_bw ::: {{1966..{1966 + n_jobs - 1}}}"
 	regex = r"bw(?:\s+)=(?:\s+)(\d+.\d+|\d+)(?:\s+)(G|M)b/s"
 	matches = run_regex_cmd(cmd, regex)
 	total = 0
@@ -119,21 +119,54 @@ def parallel_qperf_test(n_jobs = 1):
 		else:
 			total += float(m[0])
 	return [total]
-def parallel_qperf_test_1_job():
+def parallel_qperf_test_1_job_64K():
 	return parallel_qperf_test()
-def parallel_qperf_test_2_jobs():
+def parallel_qperf_test_2_jobs_64K():
 	return parallel_qperf_test(2)
-def parallel_qperf_test_4_jobs()
-	return parallel_qperf_test(4):
-def parallel_qperf_test_8_jobs():
+def parallel_qperf_test_4_jobs_64K():
+	return parallel_qperf_test(4)
+def parallel_qperf_test_8_jobs_64K():
 	return parallel_qperf_test(8)
+def parallel_qperf_test_1_job_5M():
+	return parallel_qperf_test(msg_size = '5M')
+def parallel_qperf_test_2_jobs_5M():
+	return parallel_qperf_test(2, '5M')
+def parallel_qperf_test_4_jobs_5M():
+	return parallel_qperf_test(4, '5M')
+def parallel_qperf_test_8_jobs_5M():
+	return parallel_qperf_test(8, '5M')
+def parallel_qperf_test_1_job_1G():
+	return parallel_qperf_test(msg_size = '1G')
+def parallel_qperf_test_2_jobs_1G():
+	return parallel_qperf_test(2, '1G')
+def parallel_qperf_test_4_jobs_1G():
+	return parallel_qperf_test(4, '1G')
+def parallel_qperf_test_8_jobs_1G():
+	return parallel_qperf_test(8, '1G')
+def parallel_qperf_test_1_job_100():
+	return parallel_qperf_test(msg_size = '100')
+def parallel_qperf_test_2_jobs_100():
+	return parallel_qperf_test(2, '100')
+def parallel_qperf_test_4_jobs_100():
+	return parallel_qperf_test(4, '100')
+def parallel_qperf_test_8_jobs_100():
+	return parallel_qperf_test(8, '100')
 # test functions to run, they should return an array of floats
 # this return array is the results of the performance test and 
 # are averaged at the end
-tests = [iperf3_test, trace_test, parallel_qperf_test_1_job, parallel_qperf_test_2_jobs, parallel_qperf_test_4_jobs, parallel_qperf_test_8_jobs]
+tests = [iperf3_test, trace_test, 
+		parallel_qperf_test_1_job_64K, parallel_qperf_test_2_jobs_64K, parallel_qperf_test_4_jobs_64K, parallel_qperf_test_8_jobs_64K, 
+		parallel_qperf_test_1_job_5M, parallel_qperf_test_2_jobs_5M, parallel_qperf_test_4_jobs_5M, parallel_qperf_test_8_jobs_5M,
+		parallel_qperf_test_1_job_1G, parallel_qperf_test_2_jobs_1G, parallel_qperf_test_4_jobs_1G, parallel_qperf_test_8_jobs_1G,
+		parallel_qperf_test_1_job_100, parallel_qperf_test_2_jobs_100, parallel_qperf_test_4_jobs_100, parallel_qperf_test_8_jobs_100
+		]
 # functions to return a string representing the results returned from tests
 # MAKE SURE SAME ORDER
-print_tests = [iperf3_test_print, trace_print, parallel_qperf_print, parallel_qperf_print, parallel_qperf_print, parallel_qperf_print]
+print_tests = [iperf3_test_print, trace_print, 
+			parallel_qperf_print, parallel_qperf_print, parallel_qperf_print, parallel_qperf_print,
+			parallel_qperf_print, parallel_qperf_print, parallel_qperf_print, parallel_qperf_print,
+			parallel_qperf_print, parallel_qperf_print, parallel_qperf_print, parallel_qperf_print,
+			parallel_qperf_print, parallel_qperf_print, parallel_qperf_print, parallel_qperf_print]
 
 # returns True for $? == 0 else False
 def run_cmd(cmd):
