@@ -33,7 +33,7 @@ def iperf3_test():
 	# return [bitrate (in Gbits/sec), retries]
 	command = f"iperf3 -c {iperf3_server_ip} -t 60"
 	results = run_regex_cmd(command, r"(\d+\.\d+) Gbits/sec(?:\s+)(\d+)(?:\s+) sender")
-	ret = [float(results[0][0]), float(results[0][1])]
+	ret = [float(results[0][0].replace(',','')), float(results[0][1].replace(',',''))]
 	return ret
 
 trace_func_tracked = ["ibmveth_start_xmit", "ibmveth_poll"]
@@ -115,9 +115,9 @@ def parallel_qperf_test(n_jobs = 1, msg_size = '64K'):
 	for m in matches:
 		if m[1] == 'G':
 			#convert to Mb's
-			total += (float(m[0]) * 1024)
+			total += (float(m[0].replace(',','')) * 1024)
 		else:
-			total += float(m[0])
+			total += float(m[0].replace(',',''))
 	return [total]
 def parallel_qperf_test_1_job_64K():
 	return parallel_qperf_test()
