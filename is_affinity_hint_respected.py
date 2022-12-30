@@ -1,11 +1,12 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env python
 import os
 import sys
 import subprocess
+from subprocess import PIPE
 
 def run_command(command, rc_expect=0):
     # exit if not the return value we expect
-    cmd_rst = subprocess.run(command.split(), capture_output=True)
+    cmd_rst = subprocess.run(command.split(), stdout=PIPE, stderr=PIPE)
     if cmd_rst.returncode != rc_expect:
         print(f"Command failed with rc {cmd_rst.returncode}")
         print(f"STDERR:\n{cmd_rst.stderr.decode()}")
@@ -16,7 +17,7 @@ def run_command(command, rc_expect=0):
 def get_irqs_for_drc(drc):
     cmd_out = run_command(f"cat /proc/interrupts").split('\n')
     proc_irqs = [line for line in cmd_out if drc+"-" in line]
-    irqs = [line.split(':')[0] for line in proc_irqs]
+    irqs = [line.split(':')[0].strip() for line in proc_irqs]
     return irqs
 
 def expected_num_cpu_per_irq(n_irqs):
