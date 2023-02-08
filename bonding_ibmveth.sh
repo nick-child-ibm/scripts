@@ -29,21 +29,22 @@ done
 
 echo \> "modprobe bonding"
 modprobe bonding
+sleep 1
 echo \> "echo +${bond_device} > /sys/class/net/bonding_masters"
 echo +${bond_device} > /sys/class/net/bonding_masters
-
+sleep 1
 # balance rr
-echo \> "echo 0  > /sys/class/net/bond4/bonding/mode"
-echo 0  > /sys/class/net/bond4/bonding/mode
-
-echo \> "echo 100 > /sys/class/net/bond4/bonding/miimon"
-echo 100 > /sys/class/net/bond4/bonding/miimon
+echo \> "echo 0  > /sys/class/net/${bond_device}/bonding/mode"
+echo 0  > /sys/class/net/${bond_device}/bonding/mode
+sleep 1
+echo \> "echo 100 > /sys/class/net/${bond_device}/bonding/miimon"
+echo 100 > /sys/class/net/${bond_device}/bonding/miimon
 
 for d in ${devices[@]}; do
-	echo \> "echo +${d} > /sys/class/net/bond4/bonding/slaves"
-	echo +${d} > /sys/class/net/bond4/bonding/slaves
+	echo \> "echo +${d} > /sys/class/net/${bond_device}/bonding/slaves"
+	echo +${d} > /sys/class/net/${bond_device}/bonding/slaves
 done
-
+sleep 1
 for d in ${devices[@]}; do
 	echo \> "ip link set $d up"
 	ip link set $d up
@@ -51,6 +52,7 @@ done
 
 echo \> "ip addr add $bond_ip dev $bond_device"
 ip addr add $bond_ip dev $bond_device
+sleep 1
 echo \> "ip link set $bond_device up"
 ip link set $bond_device up
 
