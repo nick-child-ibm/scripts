@@ -66,7 +66,9 @@ for irq in irqs:
         pass_flag = False
 
 if pass_flag:
+    print("SUCCESS: CPUs are optimally assigned to IRQs")
     quit(0)
 else:
+    print("FAIL: CPUs are not optimally assigned to IRQs")
     quit(1)
 
