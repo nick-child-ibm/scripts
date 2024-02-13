@@ -1,0 +1,5 @@
+kprobe:ibmvnic_tx_scrq_flush
+{
+    @buffs = lhist(*(int32 *)(arg1+88), 0, 128, 1)
+}
+
