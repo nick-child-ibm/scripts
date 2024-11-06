@@ -1,0 +1,80 @@
+#include <net/sock.h>
+#include <net/inet_sock.h>
+#include <net/inet_connection_sock.h>
+#include <net/tcp.h>
+#include <linux/netdevice.h>
+
+kprobe:sk_error_report {
+    $sock = (struct sock *)arg0;
+    $isock = (struct inet_sock *)arg0;
+    $tsock = (struct tcp_sock *)arg0;
+    printf ("%s - SK_ERR(%d) saddr=%p:%hu -snd_wnd %u\n%s\n",
+                strftime("%H:%M:%S:%f", nsecs),
+                $sock->sk_err,
+                $isock->inet_saddr,
+                $isock->inet_sport,
+                $tsock->snd_wnd,
+                kstack());
+}
+
+kprobe:tcp_send_probe0 {
+    $sock = (struct sock *)arg0;
+    $isock = (struct inet_sock *)arg0;
+    $icsock = (struct inet_connection_sock *)arg0;
+    $tsock = (struct tcp_sock *)arg0;
+    printf ("%s - send_probe0 - saddr=%p:%hu - snd_wnd %u, icsk_probes_out = %u+1\n",
+                strftime("%H:%M:%S:%f", nsecs), $isock->inet_saddr,
+                $isock->inet_sport, $tsock->snd_wnd, $icsock->icsk_probes_out);
+}
+
+kprobe:tcp_write_timer_handler {
+    $sock = (struct sock *)arg0;
+    $isock = (struct inet_sock *)arg0;
+    $icsock = (struct inet_connection_sock *)arg0;
+    $tsock = (struct tcp_sock *)arg0;
+    
+    if ($icsock->icsk_pending == ICSK_TIME_PROBE0 || $icsock->icsk_pending == ICSK_TIME_RETRANS) {
+        printf ("%s - write_timer - saddr=%p:%hu - snd_wnd %u, event %u\n",
+                    strftime("%H:%M:%S:%f", nsecs), $isock->inet_saddr,
+                    $isock->inet_sport, $tsock->snd_wnd, $icsock->icsk_pending);
+    }
+}
+
+kprobe:netif_carrier_off {
+    $dev = (struct net_device *)arg0;
+    printf ("%s - netif_carrier_off %s\n",
+                strftime("%H:%M:%S:%f", nsecs), $dev->name);
+}
+
+kprobe:dev_deactivate {
+    $dev = (struct net_device *)arg0;
+    printf ("%s - dev_deactivate %s\n",
+                strftime("%H:%M:%S:%f", nsecs), $dev->name);
+}
+kprobe: linkwatch_fire_event {
+    $dev = (struct net_device *)arg0;
+    printf ("%s - linkwatch_fire_event (sched) %s - state %d\n%s\n",
+                strftime("%H:%M:%S:%f", nsecs), $dev->name, $dev->state, kstack());
+}
+
+kprobe:linkwatch_do_dev {
+ $dev = (struct net_device *)arg0;
+    printf ("%s - linkwatch_do_dev %s - state %d\n",
+                strftime("%H:%M:%S:%f", nsecs), $dev->name, $dev->state);
+}
+
+kretprobe:__dev_direct_xmit {
+    if (!retval) {
+        return;
+    }
+    printf ("%s - direct_xmit rc = %d\n",
+                strftime("%H:%M:%S:%f", nsecs), retval);
+}
+
+kretprobe:dev_queue_xmit {
+    if (!retval) {
+        return;
+    }
+    printf ("%s - dev_queue_xmit rc = %d\n",
+                strftime("%H:%M:%S:%f", nsecs), retval);
+}
