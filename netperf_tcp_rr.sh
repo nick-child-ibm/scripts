@@ -1,7 +1,7 @@
 #!/bin/sh
 
 if [ $# -ne 4 ]; then
-        echo -e "\nPlease use '$0 <Server IP> <Exec Time> <nConnections>' to run this command!\n"
+        echo -e "\nPlease use '$0 <Server IP> <Exec Time> <nConnections> <packetSize>' to run this command!\n"
         exit 1
 fi
 
