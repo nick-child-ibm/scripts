@@ -1,0 +1,9 @@
+#!/usr/local/bin/bpftrace
+kprobe:rtnl_lock,kprobe:rtnl_unlock,kprobe:rtnl_trylock 
+{
+	printf("%s, %s\n",strftime("%H:%M:%S:%f", nsecs), kstack());
+}
+
+kretprobe:rtnl_lock {
+	printf ("GOT IT %s, %s\n", strftime("%H:%M:%S:%f", nsecs), kstack());\
+}

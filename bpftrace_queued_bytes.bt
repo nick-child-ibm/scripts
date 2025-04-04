@@ -1,0 +1,34 @@
+#include <linux/skbuff.h>
+#include <linux/netdevice.h>
+
+// USER TODO: fill in device_name
+// The script will start measuring when the device is reset (ip l s net0 down; ip l s net0 up)
+// This is to avoid dealing w network traffic occuring before tracing started 
+BEGIN {
+ @device_name = "net0";
+ @start = 0;
+}
+
+kprobe:netif_tx_stop_all_queues {
+    if (@start == 1) {
+        exit();
+    }
+    @start = 1;
+}
+
+// record the number of bytes being queued to a particular queue
+tracepoint:net:net_dev_queue /str(args->name) == @device_name && @start/ {
+    $queue = ((struct sk_buff *)args->skbaddr)->queue_mapping;
+    @bytes_queued[$queue] += args->len;
+}
+
+// record the number of bytes that were dequeued from a particular queue and update the histogram
+tracepoint:net:net_dev_start_xmit /@bytes_queued[args->queue_mapping] && str(args->name) == @device_name && @start/ {
+    if (@bytes_queued[args->queue_mapping] <= args->len){
+        @bytes_queued[args->queue_mapping] = 0;
+    }
+    else {
+        @bytes_queued[args->queue_mapping] -= args->len;
+    }
+    @outstanding_bytes[args->queue_mapping] = hist(@bytes_queued[args->queue_mapping]);
+}

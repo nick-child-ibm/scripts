@@ -36,7 +36,7 @@ def parse_dir(d):
 		for i in iterations:
 			file = f"{d}/{test}/{i}"
 			for line in open(file):
-				if "[SUM] 0.00-10.00" in line:
+				if "[SUM] 0.00-10." in line:
 					i_result.append(float(line.split()[5]))
 		i_result.sort()
 		results[test] = i_result
@@ -51,15 +51,49 @@ def create_plots(dir):
 	color_arr = ['b', 'r', 'm', 'y', 'g', 'k']
 	# for every test make a line
 	line_itr = 0
+		# UNCOMMENT FOR LINE GRAPH
+	# for test in results.keys():
+	# 	x_axis = list(range(1,len(results[test])+1))
+	# 	y_axis = results[test]
+	# 	print(f"plotting: x={x_axis} y={y_axis}")
+	# 	#color = color_arr[line_itr % len(color_arr)]
+	# 	plots.plot(x_axis, y_axis, 'o-', label = test )
+	# plots.set(title = f"Sorted throughput over several iterations", xlabel="iteration", ylabel="Bandwidth (Gbit/s)")	
+	# handles, labels = plots.get_legend_handles_labels()
+	# fig.legend(handles, labels, loc='lower right')
+
+	bar_dist = 0.2
+	num_bars = 3
+	max_y = []
+	min_y = []
+	avg_y = []
+	x_axis = numpy.arange(len(results))
+
+	min_min = 100
 	for test in results.keys():
-		x_axis = list(range(1,len(results[test])+1))
-		y_axis = results[test]
-		print(f"plotting: x={x_axis} y={y_axis}")
+		if min_min > results[test][0]:
+			min_min = results[test][0]
+		max_y.append(results[test][-1])
+		min_y.append(results[test][0])
+		avg_y.append(numpy.average(results[test]))
+
+	avg_y, min_y, max_y, keys = zip(*sorted(zip(avg_y, min_y, max_y, results.keys())))
+	plots.bar(x_axis, min_y, width = bar_dist, label = "min")
+	plots.bar([x + (1 * bar_dist) for x in x_axis], avg_y, width = bar_dist, label="avg")
+	plots.bar([x + (2 * bar_dist) for x in x_axis], max_y, width = bar_dist, label="max")
+
+	for i in range(len(keys)):
+		plots.text((x_axis[i]) - (bar_dist / 2), min_y[i] + 0.1, int(min_y[i]))
+		plots.text((x_axis[i]) + (1 * bar_dist) - (bar_dist / 2), avg_y[i] + 0.1, int(avg_y[i]))
+		plots.text((x_axis[i]) + (2*bar_dist) - (bar_dist / 2), max_y[i] + 0.1, int(max_y[i]))
+
+	plots.set_xticks([x + (1 * bar_dist) for x in x_axis])
+	plots.set_xticklabels(keys)
 		#color = color_arr[line_itr % len(color_arr)]
-		plots.plot(x_axis, y_axis, 'o-', label = test )
-	plots.set(title = f"Sorted throughput over several iterations", xlabel="iteration", ylabel="Bandwidth (Gbit/s)")	
+	plots.set(title = f"Sorted throughput over {len(next(iter(results.values())))} iterations", xlabel="config type", ylabel="Bandwidth (Gbit/s)", ylim = 14)	
 	handles, labels = plots.get_legend_handles_labels()
-	fig.legend(handles, labels, loc='lower right')
+	fig.legend(handles, labels, loc='upper right')
+	
 	plt.show()
 
 if (len(sys.argv) < 2):

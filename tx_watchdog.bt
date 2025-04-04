@@ -1,0 +1,21 @@
+#include "netdevice.h"
+//#include <bpf_helpers.h>
+//#define offsetof(TYPE, MEMBER)    ((unsigned long)&((TYPE *)0)->MEMBER)
+
+kprobe:dev_watchdog {
+    $add1= ((uint64)(((struct net_device *)arg0)->watchdog_timer));
+    $add2 = (uint64)((struct net_device *)arg0);
+    $diff = $add1 - $add2;
+    $dev = (struct net_device *)(arg0 - $diff);
+    printf ("sup %s - %lu + %d, dev->state = %lu, q->state=%lu\n",
+                $dev->name,
+                $dev->_tx->trans_start,
+                $dev->watchdog_timeo,
+                $dev->state,
+                $dev->_tx->state);
+}
+
+kprobe:ibmvnic_open {
+printf("IBMVNIC OPEN DEV=%p\n",arg0);
+}
+
